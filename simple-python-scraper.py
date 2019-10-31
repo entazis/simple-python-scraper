@@ -7,17 +7,21 @@ from bs4 import BeautifulSoup
 import pickle
 import os.path
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
 # If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/spreadsheets.readonly']
+
+# The ID and range of the spreadsheet containing urls to scrape from.
+URL_SPREADSHEET_ID = '10aF-7QKoOA0EgHPeDFIWLvCr4iIOv51OVB4pI6t642s'
+URL_RANGE_NAME = 'Sheet1!A:A'
 
 
 def authorize():
-    """Shows basic usage of the Drive v3 API.
-    Prints the names and ids of the first 10 files the user has access to.
-    """
     creds = None
     # The file token.pickle stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -37,19 +41,49 @@ def authorize():
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
 
+
+def get_urls_from_google_sheet():
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+
+    service = build('sheets', 'v4', credentials=creds)
+
+    # Call the Sheets API
+    sheet = service.spreadsheets()
+    result = sheet.values().get(
+        spreadsheetId=URL_SPREADSHEET_ID,
+        range=URL_RANGE_NAME).execute()
+    values = result.get('values', [])
+
+    if not values:
+        print('No data found.')
+    else:
+        print('Name, Major:')
+        for row in values:
+            # Print columns A
+            print('url: %s' % (row[0]))
+
+
+def upload_to_google_drive():
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+
     service = build('drive', 'v3', credentials=creds)
 
     # Call the Drive v3 API
-    results = service.files().list(
-        pageSize=20, fields="nextPageToken, files(id, name)").execute()
-    items = results.get('files', [])
+    file_metadata = {'name': 'output-2.csv'}
+    media = MediaFileUpload(
+        'output-2.csv',
+        mimetype='text/csv',
+        resumable=True)
+    file = service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id').execute()
 
-    if not items:
-        print('No files found.')
-    else:
-        print('Files:')
-        for item in items:
-            print(u'{0} ({1})'.format(item['name'], item['id']))
+    print('File ID: %s' % file.get('id'))
 
 
 def simple_get(url, headers, proxies):
@@ -139,6 +173,10 @@ def get_address_info():
 if __name__ == '__main__':
     print('Google drive authorization..')
     authorize()
-    # print('Getting data from v3.torontomls.net..')
-    # address_info = get_address_info()
+    print('Getting urls from Google sheet..')
+    get_urls_from_google_sheet()
+    print('Uploading file to Google drive..')
+    upload_to_google_drive()
+    print('Getting data from v3.torontomls.net..')
+    address_info = get_address_info()
     print('done.\n')
