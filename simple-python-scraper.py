@@ -1,3 +1,4 @@
+import csv
 from requests import get
 from requests.exceptions import RequestException
 from contextlib import closing
@@ -48,6 +49,40 @@ def get_address_info():
     if response is not None:
         html = BeautifulSoup(response, 'html.parser')
         forms = html.select('div.formitem.legacyBorder')
+        rows = []
+        columns = []
+
+        for form in forms:
+            img = form.select('img.imageset')
+            image_url = img[0]['src']
+            print(image_url)
+            form_fields = form.select('span.formitem.formfield')
+            form_object = {}
+            for idx, form_field in enumerate(form_fields):
+                label = 'text-' + str(idx) + ':'
+                if (len(form_field.contents) > 1):
+                    label = form_field.contents[0].text
+                    value = form_field.contents[1].text
+                else:
+                    value = form_field.text
+
+                form_object[label] = value
+            print(form_object)
+
+            keys = form_object.keys()
+            row = form_object.values()
+            columns = keys
+            rows.append(row)
+
+            with open('output.csv', 'w') as output_file:
+                dict_writer = csv.writer(output_file)
+                dict_writer.writerow(keys)
+                dict_writer.writerow(row)
+
+        with open('output-2.csv', 'w') as output_file:
+            dict_writer = csv.writer(output_file)
+            dict_writer.writerow(keys)
+            dict_writer.writerows(rows)
 
         return forms
 
