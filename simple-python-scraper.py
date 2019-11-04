@@ -24,17 +24,20 @@ SCOPES = [
 URL_SPREADSHEET_ID = '10aF-7QKoOA0EgHPeDFIWLvCr4iIOv51OVB4pI6t642s'
 URL_RANGE_NAME = 'Sheet1!A:A'
 
-COLUMNS = ['List:', 'For:', 'SPIS:', 'Last Status:', 'DOM:', 'Unit#:', 'Corp#:', 'Locker#:', 'Locker Lev Unit:',
-           'Locker Unit#:', 'Level:', 'Rms:', 'Bedrooms:', 'Washrooms:', 'Dir/Cross St:', 'Prop Mgmt:', 'MLS#:',
-           'Contract Date:', 'PIN#:', 'Possession Date:', 'Possession Remarks:', 'Kitchens:', 'Fam Rm:', 'Basement:',
-           'Fireplace/Stv:', 'Heat:', 'Apx Age:', 'Apx Sqft:', 'Sqft Source:', 'Exposure:', 'Phys Hdp-Eqp:',
-           'Spec Desig:', 'Lndry Acc:', 'Lndry Lev:', 'Pets Perm:', 'Locker:', 'Maintenance:', 'A/C:', 'Central Vac:',
-           'UFFI:', 'Elev/Lift:', 'Retirement:', 'All Incl:', 'Water Incl:', 'Heat Incl:', 'Hydro Incl:',
-           'Cable TV Incl:', 'CAC Incl:', 'Bldg Ins Incl:', 'Prkg Incl:', 'ComElem Inc:', 'Energy Cert:', 'Cert Level:',
-           'GreenPIS:', 'Pvt Ent:', 'Furnished:', 'Balcony:', 'Exterior:', 'Gar/Gar Spcs:', 'Park/Drive:', 'Park Type:',
-           'Park/Drv Spcs:', 'Tot Prk Spcs:', 'Park $/Mo:', 'Prk Lvl/Unit:', 'Bldg Amen:', 'Prop Feat:',
-           'Client Remks:', 'Extras:', 'Listing Contracted With:',
-           'Image URL:', 'Data without label:', 'Status:']
+COLUMNS = [
+    'Key:',
+    'List:', 'For:', 'SPIS:', 'Last Status:', 'DOM:', 'Unit#:', 'Corp#:', 'Locker#:', 'Locker Lev Unit:',
+    'Locker Unit#:', 'Level:', 'Rms:', 'Bedrooms:', 'Washrooms:', 'Dir/Cross St:', 'Prop Mgmt:', 'MLS#:',
+    'Contract Date:', 'PIN#:', 'Possession Date:', 'Possession Remarks:', 'Kitchens:', 'Fam Rm:', 'Basement:',
+    'Fireplace/Stv:', 'Heat:', 'Apx Age:', 'Apx Sqft:', 'Sqft Source:', 'Exposure:', 'Phys Hdp-Eqp:',
+    'Spec Desig:', 'Lndry Acc:', 'Lndry Lev:', 'Pets Perm:', 'Locker:', 'Maintenance:', 'A/C:', 'Central Vac:',
+    'UFFI:', 'Elev/Lift:', 'Retirement:', 'All Incl:', 'Water Incl:', 'Heat Incl:', 'Hydro Incl:',
+    'Cable TV Incl:', 'CAC Incl:', 'Bldg Ins Incl:', 'Prkg Incl:', 'ComElem Inc:', 'Energy Cert:', 'Cert Level:',
+    'GreenPIS:', 'Pvt Ent:', 'Furnished:', 'Balcony:', 'Exterior:', 'Gar/Gar Spcs:', 'Park/Drive:', 'Park Type:',
+    'Park/Drv Spcs:', 'Tot Prk Spcs:', 'Park $/Mo:', 'Prk Lvl/Unit:', 'Bldg Amen:', 'Prop Feat:',
+    'Client Remks:', 'Extras:', 'Listing Contracted With:',
+    'Image URL:', 'Data without label:', 'Status:'
+]
 
 
 def authorize():
@@ -119,6 +122,9 @@ def update_csv_on_google_drive(google_drive_file_id):
             status, done = downloader.next_chunk()
             print('Download %d%%.' % int(status.progress() * 100))
 
+        df = pd.read_csv('output.csv')
+        df_former = pd.read_csv('output-from-drive.csv', index_col=False)
+
         media_body = MediaFileUpload(
             'output.csv',
             mimetype='text/csv',
@@ -201,7 +207,7 @@ def get_address_info(urls):
                         else:
                             value = form_field.text
                             values_without_label.append(value)
-
+                    sr.at['Key:'] = '-'.join(values_without_label[0:14])
                     sr.at['Data without label:'] = ' - '.join(values_without_label)
                     sr.at['Status:'] = 'Available'
                     df = df.append(sr, ignore_index=True).fillna('-')
@@ -212,7 +218,7 @@ def get_address_info(urls):
         except Exception as e:
             log_error(e)
 
-    df.to_csv('output.csv')
+    df.to_csv('output.csv', index=False)
     return True
 
 
