@@ -1,13 +1,15 @@
-import csv
 from requests import get
 from requests.exceptions import RequestException
 from contextlib import closing
 from bs4 import BeautifulSoup
+import pandas as pd
+import io
 
 import pickle
 import os.path
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaIoBaseDownload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
@@ -21,6 +23,18 @@ SCOPES = [
 # The ID and range of the spreadsheet containing urls to scrape from.
 URL_SPREADSHEET_ID = '10aF-7QKoOA0EgHPeDFIWLvCr4iIOv51OVB4pI6t642s'
 URL_RANGE_NAME = 'Sheet1!A:A'
+
+COLUMNS = ['List:', 'For:', 'SPIS:', 'Last Status:', 'DOM:', 'Unit#:', 'Corp#:', 'Locker#:', 'Locker Lev Unit:',
+           'Locker Unit#:', 'Level:', 'Rms:', 'Bedrooms:', 'Washrooms:', 'Dir/Cross St:', 'Prop Mgmt:', 'MLS#:',
+           'Contract Date:', 'PIN#:', 'Possession Date:', 'Possession Remarks:', 'Kitchens:', 'Fam Rm:', 'Basement:',
+           'Fireplace/Stv:', 'Heat:', 'Apx Age:', 'Apx Sqft:', 'Sqft Source:', 'Exposure:', 'Phys Hdp-Eqp:',
+           'Spec Desig:', 'Lndry Acc:', 'Lndry Lev:', 'Pets Perm:', 'Locker:', 'Maintenance:', 'A/C:', 'Central Vac:',
+           'UFFI:', 'Elev/Lift:', 'Retirement:', 'All Incl:', 'Water Incl:', 'Heat Incl:', 'Hydro Incl:',
+           'Cable TV Incl:', 'CAC Incl:', 'Bldg Ins Incl:', 'Prkg Incl:', 'ComElem Inc:', 'Energy Cert:', 'Cert Level:',
+           'GreenPIS:', 'Pvt Ent:', 'Furnished:', 'Balcony:', 'Exterior:', 'Gar/Gar Spcs:', 'Park/Drive:', 'Park Type:',
+           'Park/Drv Spcs:', 'Tot Prk Spcs:', 'Park $/Mo:', 'Prk Lvl/Unit:', 'Bldg Amen:', 'Prop Feat:',
+           'Client Remks:', 'Extras:', 'Listing Contracted With:',
+           'Image URL:', 'Data without label:', 'Status:']
 
 
 def authorize():
@@ -66,7 +80,6 @@ def get_urls_from_google_sheet():
         print('No urls found in the spreadsheet.')
     else:
         for row in values:
-            print('url: %s' % (row[0]))
             spreadsheet_urls.append(row[0])
 
     return spreadsheet_urls
@@ -97,6 +110,14 @@ def upload_csv_to_google_drive():
 def update_csv_on_google_drive(google_drive_file_id):
     try:
         service = build('drive', 'v3', credentials=get_creds())
+
+        request = service.files().get_media(fileId=google_drive_file_id)
+        fh = io.FileIO('output-from-drive.csv', 'wb')
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+            print('Download %d%%.' % int(status.progress() * 100))
 
         media_body = MediaFileUpload(
             'output.csv',
@@ -152,52 +173,46 @@ def get_address_info(urls):
         'https': 'http://194.226.34.132:5555'
     }
 
-    rows_with_label = []
-    labels = []
+    df = pd.DataFrame(columns=COLUMNS)
 
     for url in urls:
         try:
+            print('Scraping URL: ', url)
             response = simple_get(url, headers, proxies)
 
             if response is not None:
                 html = BeautifulSoup(response, 'html.parser')
                 forms = html.select('div.formitem.legacyBorder')
 
-                for form in forms:
+                for form_index, form in enumerate(forms):
+                    sr = pd.Series()
+                    values_without_label = []
+
                     img = form.select('img.imageset')
-                    image_url = img[0]['src']
+                    sr.at['Image URL:'] = img[0]['src']
 
                     form_fields = form.select('span.formitem.formfield')
-                    label_value_object = {}
-                    index_value_object = {}
 
                     for idx, form_field in enumerate(form_fields):
                         if len(form_field.contents) > 1:
                             label = form_field.contents[0].text
                             value = form_field.contents[1].text
-                            label_value_object[label] = value
+                            sr.at[label] = value
                         else:
                             value = form_field.text
-                            index_value_object[idx] = value
+                            values_without_label.append(value)
 
-                    label_value_object['Data without label:'] = index_value_object.values()
+                    sr.at['Data without label:'] = ' - '.join(values_without_label)
+                    sr.at['Status:'] = 'Available'
+                    df = df.append(sr, ignore_index=True).fillna('-')
 
-                    labs = label_value_object.keys()
-                    lab_values = label_value_object.values()
-
-                    labels = labs
-                    rows_with_label.append(lab_values)
             else:
                 raise Exception('Error retrieving contents at {}'.format(url))
 
         except Exception as e:
             log_error(e)
 
-    with open('output.csv', 'w') as output_file:
-        dict_writer = csv.writer(output_file)
-        dict_writer.writerow(labels)
-        dict_writer.writerows(rows_with_label)
-
+    df.to_csv('output.csv')
     return True
 
 
