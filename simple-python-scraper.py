@@ -16,6 +16,8 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/spreadsheets.readonly']
 
+# If deleting output file on google drive delete file-id.txt
+
 # The ID and range of the spreadsheet containing urls to scrape from.
 URL_SPREADSHEET_ID = '10aF-7QKoOA0EgHPeDFIWLvCr4iIOv51OVB4pI6t642s'
 URL_RANGE_NAME = 'Sheet1!A:A'
@@ -42,12 +44,15 @@ def authorize():
             pickle.dump(creds, token)
 
 
-def get_urls_from_google_sheet():
+def get_creds():
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
+            return creds
 
-    service = build('sheets', 'v4', credentials=creds)
+
+def get_urls_from_google_sheet():
+    service = build('sheets', 'v4', credentials=get_creds())
 
     # Call the Sheets API
     sheet = service.spreadsheets()
@@ -61,31 +66,51 @@ def get_urls_from_google_sheet():
         print('No urls found in the spreadsheet.')
     else:
         for row in values:
-            # Print columns A
             print('url: %s' % (row[0]))
             spreadsheet_urls.append(row[0])
+
     return spreadsheet_urls
 
 
-def upload_to_google_drive():
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
+def upload_csv_to_google_drive():
+    try:
+        service = build('drive', 'v3', credentials=get_creds())
 
-    service = build('drive', 'v3', credentials=creds)
+        file_metadata = {'name': 'output.csv'}
+        media = MediaFileUpload(
+            'output.csv',
+            mimetype='text/csv',
+            resumable=True)
 
-    # Call the Drive v3 API
-    file_metadata = {'name': 'output.csv'}
-    media = MediaFileUpload(
-        'output.csv',
-        mimetype='text/csv',
-        resumable=True)
-    file = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id').execute()
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id').execute()
 
-    print('File ID: %s' % file.get('id'))
+        print('Created file ID: %s' % file.get('id'))
+        return file.get('id')
+
+    except Exception as e:
+        log_error(e)
+
+
+def update_csv_on_google_drive(google_drive_file_id):
+    try:
+        service = build('drive', 'v3', credentials=get_creds())
+
+        media_body = MediaFileUpload(
+            'output.csv',
+            mimetype='text/csv',
+            resumable=True)
+
+        updated_file = service.files().update(
+            fileId=google_drive_file_id,
+            media_body=media_body).execute()
+
+        print('Updated file ID: %s' % updated_file.get('id'))
+
+    except Exception as e:
+        log_error(e)
 
 
 def simple_get(url, headers, proxies):
@@ -113,7 +138,6 @@ def log_error(e):
 
 
 def get_address_info(urls):
-    url = 'http://v3.torontomls.net/Live/Pages/Public/Link.aspx?Key=95089319b90c45e3b1cc10298ba6bab8&App=TREB'
     headers = {
         "Host": "v3.torontomls.net",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36",
@@ -128,8 +152,8 @@ def get_address_info(urls):
         'https': 'http://194.226.34.132:5555'
     }
 
-    rows = []
-    columns = []
+    rows_with_label = []
+    labels = []
 
     for url in urls:
         try:
@@ -144,23 +168,25 @@ def get_address_info(urls):
                     image_url = img[0]['src']
 
                     form_fields = form.select('span.formitem.formfield')
-                    form_object = {}
+                    label_value_object = {}
+                    index_value_object = {}
 
                     for idx, form_field in enumerate(form_fields):
-                        label = 'text-' + str(idx) + ':'
                         if len(form_field.contents) > 1:
                             label = form_field.contents[0].text
                             value = form_field.contents[1].text
+                            label_value_object[label] = value
                         else:
                             value = form_field.text
+                            index_value_object[idx] = value
 
-                        form_object[label] = value
-                    print(form_object)
+                    label_value_object['Data without label:'] = index_value_object.values()
 
-                    keys = form_object.keys()
-                    row = form_object.values()
-                    columns = keys
-                    rows.append(row)
+                    labs = label_value_object.keys()
+                    lab_values = label_value_object.values()
+
+                    labels = labs
+                    rows_with_label.append(lab_values)
             else:
                 raise Exception('Error retrieving contents at {}'.format(url))
 
@@ -169,8 +195,8 @@ def get_address_info(urls):
 
     with open('output.csv', 'w') as output_file:
         dict_writer = csv.writer(output_file)
-        dict_writer.writerow(columns)
-        dict_writer.writerows(rows)
+        dict_writer.writerow(labels)
+        dict_writer.writerows(rows_with_label)
 
     return True
 
@@ -180,12 +206,19 @@ if __name__ == '__main__':
     authorize()
 
     print('Getting urls from Google sheet..')
-    urls = get_urls_from_google_sheet()
+    urls_from_sheet = get_urls_from_google_sheet()
 
     print('Getting data from v3.torontomls.net..')
-    get_address_info(urls)
+    get_address_info(urls_from_sheet)
 
-    print('Uploading file to Google drive..')
-    upload_to_google_drive()
+    if os.path.exists('file-id.txt'):
+        file_id_file = open("file-id.txt", "r")
+        print('Updating file on Google drive..')
+        update_csv_on_google_drive(file_id_file.read())
+    else:
+        print('Uploading file to Google drive..')
+        file_id = upload_csv_to_google_drive()
+        file_id_file = open("file-id.txt", "w")
+        file_id_file.write(file_id)
 
     print('done.\n')
