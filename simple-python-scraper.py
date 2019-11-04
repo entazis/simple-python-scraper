@@ -57,12 +57,13 @@ def get_urls_from_google_sheet():
     values = result.get('values', [])
 
     if not values:
-        print('No data found.')
+        print('No urls found in the spreadsheet.')
     else:
-        print('Name, Major:')
+        print('Urls:')
         for row in values:
             # Print columns A
             print('url: %s' % (row[0]))
+        return values
 
 
 def upload_to_google_drive():
@@ -73,9 +74,9 @@ def upload_to_google_drive():
     service = build('drive', 'v3', credentials=creds)
 
     # Call the Drive v3 API
-    file_metadata = {'name': 'output-2.csv'}
+    file_metadata = {'name': 'output.csv'}
     media = MediaFileUpload(
-        'output-2.csv',
+        'output.csv',
         mimetype='text/csv',
         resumable=True)
     file = service.files().create(
@@ -110,7 +111,7 @@ def log_error(e):
     print(e)
 
 
-def get_address_info():
+def get_address_info(urls):
     url = 'http://v3.torontomls.net/Live/Pages/Public/Link.aspx?Key=95089319b90c45e3b1cc10298ba6bab8&App=TREB'
     headers = {
         "Host": "v3.torontomls.net",
@@ -125,58 +126,65 @@ def get_address_info():
         'http': 'http://194.226.34.132:5555',
         'https': 'http://194.226.34.132:5555'
     }
-    response = simple_get(url, headers, proxies)
 
-    if response is not None:
-        html = BeautifulSoup(response, 'html.parser')
-        forms = html.select('div.formitem.legacyBorder')
-        rows = []
-        columns = []
+    rows = []
+    columns = []
 
-        for form in forms:
-            img = form.select('img.imageset')
-            image_url = img[0]['src']
-            print(image_url)
-            form_fields = form.select('span.formitem.formfield')
-            form_object = {}
-            for idx, form_field in enumerate(form_fields):
-                label = 'text-' + str(idx) + ':'
-                if (len(form_field.contents) > 1):
-                    label = form_field.contents[0].text
-                    value = form_field.contents[1].text
-                else:
-                    value = form_field.text
+    for url in urls:
+        try:
+            response = simple_get(url, headers, proxies)
 
-                form_object[label] = value
-            print(form_object)
+            if response is not None:
+                html = BeautifulSoup(response, 'html.parser')
+                forms = html.select('div.formitem.legacyBorder')
 
-            keys = form_object.keys()
-            row = form_object.values()
-            columns = keys
-            rows.append(row)
+                for form in forms:
+                    img = form.select('img.imageset')
+                    image_url = img[0]['src']
 
-            with open('output.csv', 'w') as output_file:
-                dict_writer = csv.writer(output_file)
-                dict_writer.writerow(keys)
-                dict_writer.writerow(row)
+                    form_fields = form.select('span.formitem.formfield')
+                    form_object = {}
 
-        with open('output-2.csv', 'w') as output_file:
-            dict_writer = csv.writer(output_file)
-            dict_writer.writerow(keys)
-            dict_writer.writerows(rows)
+                    for idx, form_field in enumerate(form_fields):
+                        label = 'text-' + str(idx) + ':'
+                        if len(form_field.contents) > 1:
+                            label = form_field.contents[0].text
+                            value = form_field.contents[1].text
+                        else:
+                            value = form_field.text
 
-        return forms
+                        form_object[label] = value
+                    print(form_object)
 
-    raise Exception('Error retrieving contents at {}'.format(url))
+                    keys = form_object.keys()
+                    row = form_object.values()
+                    columns = keys
+                    rows.append(row)
+            else:
+                raise Exception('Error retrieving contents at {}'.format(url))
+
+        except Exception as e:
+            log_error(e)
+
+    with open('output.csv', 'w') as output_file:
+        dict_writer = csv.writer(output_file)
+        dict_writer.writerow(columns)
+        dict_writer.writerows(rows)
+
+    return True
 
 
 if __name__ == '__main__':
     print('Google drive authorization..')
     authorize()
+
     print('Getting urls from Google sheet..')
-    get_urls_from_google_sheet()
+    urls = get_urls_from_google_sheet()
+
+    print('Getting data from v3.torontomls.net..')
+    get_address_info(urls)
+
     print('Uploading file to Google drive..')
     upload_to_google_drive()
-    print('Getting data from v3.torontomls.net..')
-    address_info = get_address_info()
+
     print('done.\n')
