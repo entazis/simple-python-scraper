@@ -55,15 +55,16 @@ def get_urls_from_google_sheet():
         spreadsheetId=URL_SPREADSHEET_ID,
         range=URL_RANGE_NAME).execute()
     values = result.get('values', [])
+    spreadsheet_urls = []
 
     if not values:
         print('No urls found in the spreadsheet.')
     else:
-        print('Urls:')
         for row in values:
             # Print columns A
             print('url: %s' % (row[0]))
-        return values
+            spreadsheet_urls.append(row[0])
+    return spreadsheet_urls
 
 
 def upload_to_google_drive():
