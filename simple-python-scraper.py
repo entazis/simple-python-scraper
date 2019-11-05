@@ -75,23 +75,26 @@ def get_creds():
 
 
 def get_urls_from_google_sheet():
-    service = build('sheets', 'v4', credentials=get_creds())
+    try:
+        service = build('sheets', 'v4', credentials=get_creds())
 
-    # Call the Sheets API
-    sheet = service.spreadsheets()
-    result = sheet.values().get(
-        spreadsheetId=URL_SPREADSHEET_ID,
-        range=URL_RANGE_NAME).execute()
-    values = result.get('values', [])
-    spreadsheet_urls = []
+        sheet = service.spreadsheets()
+        result = sheet.values().get(
+            spreadsheetId=URL_SPREADSHEET_ID,
+            range=URL_RANGE_NAME).execute()
+        values = result.get('values', [])
+        spreadsheet_urls = []
 
-    if not values:
-        print('No urls found in the spreadsheet.')
-    else:
-        for row in values:
-            spreadsheet_urls.append(row[0])
+        if not values:
+            print('No urls found in the spreadsheet.')
+        else:
+            for row in values:
+                spreadsheet_urls.append(row[0])
 
-    return spreadsheet_urls
+        return spreadsheet_urls
+
+    except Exception as e:
+        log_error(e)
 
 
 def upload_csv_to_google_drive():
@@ -120,21 +123,19 @@ def update_csv_on_google_drive(google_drive_file_id):
     try:
         service = build('drive', 'v3', credentials=get_creds())
 
+        # Download the previous CSV from Google Drive
         request = service.files().get_media(fileId=google_drive_file_id)
-        fh = io.FileIO('output-from-drive.csv', 'wb')
+        fh = io.FileIO('output-previous.csv', 'wb')
         downloader = MediaIoBaseDownload(fh, request)
         done = False
         while done is False:
             status, done = downloader.next_chunk()
             print('Download %d%%.' % int(status.progress() * 100))
 
+        # Update Status
         df = pd.read_csv('output.csv')
-        df_former = pd.read_csv('output-from-drive.csv', index_col=False)
-
-        keys = '|'.join(df['Key:'])
-        diff = df_former['Key:'].str.contains(keys)
-        expired = df_former[~df_former['Key:'].str.contains(keys, na=False)]
-
+        df_former = pd.read_csv('output-previous.csv', index_col=False)
+        expired = df_former[~df_former['Key:'].str.contains('|'.join(df['Key:']), na=False)]
         if not expired.empty:
             expired['Status:'] = "Not Available"
             df = df.append(expired)
@@ -189,6 +190,8 @@ def get_address_info(urls):
         "Upgrade-Insecure-Requests": "1",
         "Cache-Control": "max-age=0"
     }
+
+    # You can choose proxies from here: https://free-proxy-list.net/
     proxies = {
         'http': 'http://194.226.34.132:5555',
         'https': 'http://194.226.34.132:5555'
