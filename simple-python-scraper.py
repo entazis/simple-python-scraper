@@ -13,12 +13,13 @@ from googleapiclient.http import MediaIoBaseDownload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
+# Enable the Drive API and download credentials.json here: https://developers.google.com/drive/api/v3/quickstart/python
+
+# If deleting output file on google drive delete file-id.txt
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = [
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/spreadsheets.readonly']
-
-# If deleting output file on google drive delete file-id.txt
 
 # The ID and range of the spreadsheet containing urls to scrape from.
 URL_SPREADSHEET_ID = '10aF-7QKoOA0EgHPeDFIWLvCr4iIOv51OVB4pI6t642s'
@@ -46,32 +47,88 @@ COLUMNS = [
 ]
 
 
-def authorize():
-    creds = None
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
+def log_error(e):
+    print(e)
 
 
-def get_creds():
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-            return creds
+def scrape_data_from_urls(urls):
+    headers = {
+        "Host": "v3.torontomls.net",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "max-age=0"
+    }
+
+    # You can choose proxies from here: https://free-proxy-list.net/
+    proxies = {
+        'http': 'http://194.226.34.132:5555',
+        'https': 'http://194.226.34.132:5555'
+    }
+
+    df = pd.DataFrame(columns=COLUMNS)
+
+    for url in urls:
+        try:
+            print('Scraping URL: ', url)
+            response = simple_get(url, headers, proxies)
+
+            if response is not None:
+                html = BeautifulSoup(response, 'html.parser')
+                forms = html.select('div.formitem.legacyBorder')
+
+                for form_index, form in enumerate(forms):
+                    sr = pd.Series()
+                    values_without_label = []
+
+                    img = form.select('img.imageset')
+                    sr.at['Image URL:'] = img[0]['src']
+
+                    form_fields = form.select('span.formitem.formfield')
+
+                    for idx, form_field in enumerate(form_fields):
+                        if len(form_field.contents) > 1:
+                            label = form_field.contents[0].text
+                            value = form_field.contents[1].text
+                            sr.at[label] = value
+                        else:
+                            value = form_field.text
+                            values_without_label.append(value)
+                    sr.at['Key:'] = '-'.join(values_without_label[0:14])
+                    sr.at['Data without label:'] = ' - '.join(values_without_label)
+                    sr.at['Status:'] = 'Available'
+                    df = df.append(sr, ignore_index=True).fillna('-')
+
+            else:
+                raise Exception('Error retrieving contents at {}'.format(url))
+
+        except Exception as e:
+            log_error(e)
+
+    df.to_csv('output.csv', index=False)
+    return True
+
+
+def simple_get(url, headers, proxies):
+    try:
+        with closing(get(url, headers=headers, proxies=proxies, stream=True)) as resp:
+            if is_good_response(resp):
+                return resp.content
+            else:
+                return None
+
+    except RequestException as e:
+        log_error('Error during requests to {0} : {1}'.format(url, str(e)))
+        return None
+
+
+def is_good_response(resp):
+    content_type = resp.headers['Content-Type'].lower()
+    return (resp.status_code == 200
+            and content_type is not None
+            and content_type.find('html') > -1)
 
 
 def get_urls_from_google_sheet():
@@ -156,88 +213,32 @@ def update_csv_on_google_drive(google_drive_file_id):
         log_error(e)
 
 
-def simple_get(url, headers, proxies):
-    try:
-        with closing(get(url, headers=headers, proxies=proxies, stream=True)) as resp:
-            if is_good_response(resp):
-                return resp.content
-            else:
-                return None
-
-    except RequestException as e:
-        log_error('Error during requests to {0} : {1}'.format(url, str(e)))
-        return None
+def get_creds():
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+            return creds
 
 
-def is_good_response(resp):
-    content_type = resp.headers['Content-Type'].lower()
-    return (resp.status_code == 200
-            and content_type is not None
-            and content_type.find('html') > -1)
-
-
-def log_error(e):
-    print(e)
-
-
-def get_address_info(urls):
-    headers = {
-        "Host": "v3.torontomls.net",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Cache-Control": "max-age=0"
-    }
-
-    # You can choose proxies from here: https://free-proxy-list.net/
-    proxies = {
-        'http': 'http://194.226.34.132:5555',
-        'https': 'http://194.226.34.132:5555'
-    }
-
-    df = pd.DataFrame(columns=COLUMNS)
-
-    for url in urls:
-        try:
-            print('Scraping URL: ', url)
-            response = simple_get(url, headers, proxies)
-
-            if response is not None:
-                html = BeautifulSoup(response, 'html.parser')
-                forms = html.select('div.formitem.legacyBorder')
-
-                for form_index, form in enumerate(forms):
-                    sr = pd.Series()
-                    values_without_label = []
-
-                    img = form.select('img.imageset')
-                    sr.at['Image URL:'] = img[0]['src']
-
-                    form_fields = form.select('span.formitem.formfield')
-
-                    for idx, form_field in enumerate(form_fields):
-                        if len(form_field.contents) > 1:
-                            label = form_field.contents[0].text
-                            value = form_field.contents[1].text
-                            sr.at[label] = value
-                        else:
-                            value = form_field.text
-                            values_without_label.append(value)
-                    sr.at['Key:'] = '-'.join(values_without_label[0:14])
-                    sr.at['Data without label:'] = ' - '.join(values_without_label)
-                    sr.at['Status:'] = 'Available'
-                    df = df.append(sr, ignore_index=True).fillna('-')
-
-            else:
-                raise Exception('Error retrieving contents at {}'.format(url))
-
-        except Exception as e:
-            log_error(e)
-
-    df.to_csv('output.csv', index=False)
-    return True
+def authorize():
+    creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
 
 
 if __name__ == '__main__':
@@ -248,7 +249,7 @@ if __name__ == '__main__':
     urls_from_sheet = get_urls_from_google_sheet()
 
     print('Getting data from v3.torontomls.net..')
-    get_address_info(urls_from_sheet)
+    scrape_data_from_urls(urls_from_sheet)
 
     if os.path.exists('file-id.txt'):
         file_id_file = open("file-id.txt", "r")
