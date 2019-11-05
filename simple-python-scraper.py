@@ -21,8 +21,9 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/spreadsheets.readonly']
 
+# Create a Google Spreadsheet and add the urls to the first column without header
 # The ID and range of the spreadsheet containing urls to scrape from.
-URL_SPREADSHEET_ID = '10aF-7QKoOA0EgHPeDFIWLvCr4iIOv51OVB4pI6t642s'
+URL_SPREADSHEET_ID = ''
 URL_RANGE_NAME = 'Sheet1!A:A'
 
 # You can set the order of the columns here
