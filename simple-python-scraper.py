@@ -24,7 +24,8 @@ SCOPES = [
 URL_SPREADSHEET_ID = '10aF-7QKoOA0EgHPeDFIWLvCr4iIOv51OVB4pI6t642s'
 URL_RANGE_NAME = 'Sheet1!A:A'
 
-# If a label does not listed here then the script adds it to the end of the csv
+# You can set the order of the columns here
+# Also if a label does not listed here then the script adds it to the end of the csv
 COLUMNS = [
     'Key:',
     'List:', 'For:', 'SPIS:', 'Last Status:', 'DOM:', 'Unit#:', 'Corp#:', 'Locker#:', 'Locker Lev Unit:',
@@ -129,6 +130,15 @@ def update_csv_on_google_drive(google_drive_file_id):
 
         df = pd.read_csv('output.csv')
         df_former = pd.read_csv('output-from-drive.csv', index_col=False)
+
+        keys = '|'.join(df['Key:'])
+        diff = df_former['Key:'].str.contains(keys)
+        expired = df_former[~df_former['Key:'].str.contains(keys, na=False)]
+
+        if not expired.empty:
+            expired['Status:'] = "Not Available"
+            df = df.append(expired)
+            df.to_csv('output.csv', index=False)
 
         media_body = MediaFileUpload(
             'output.csv',
