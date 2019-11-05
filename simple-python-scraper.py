@@ -24,6 +24,7 @@ SCOPES = [
 URL_SPREADSHEET_ID = '10aF-7QKoOA0EgHPeDFIWLvCr4iIOv51OVB4pI6t642s'
 URL_RANGE_NAME = 'Sheet1!A:A'
 
+# If a label does not listed here then the script adds it to the end of the csv
 COLUMNS = [
     'Key:',
     'List:', 'For:', 'SPIS:', 'Last Status:', 'DOM:', 'Unit#:', 'Corp#:', 'Locker#:', 'Locker Lev Unit:',
@@ -35,7 +36,11 @@ COLUMNS = [
     'Cable TV Incl:', 'CAC Incl:', 'Bldg Ins Incl:', 'Prkg Incl:', 'ComElem Inc:', 'Energy Cert:', 'Cert Level:',
     'GreenPIS:', 'Pvt Ent:', 'Furnished:', 'Balcony:', 'Exterior:', 'Gar/Gar Spcs:', 'Park/Drive:', 'Park Type:',
     'Park/Drv Spcs:', 'Tot Prk Spcs:', 'Park $/Mo:', 'Prk Lvl/Unit:', 'Bldg Amen:', 'Prop Feat:',
-    'Client Remks:', 'Extras:', 'Listing Contracted With:',
+    'Client Remks:', 'Extras:', 'Listing Contracted With:', 'Acreage:', 'All Inclusive:', 'CAC Inc:', 'Cable Inc:',
+    'Cable TV Util:', 'Com Elem Inc:', 'Contract:', 'Drive Prk Spcs:', 'Drive:', 'Farm/Agr:', 'Fronting On:', 'Gas:',
+    'Heat Inc:', 'Hydro Inc:', 'Hydro Util:', 'Irreg:', 'Lease:', 'Lndy Lev:', 'Lot:', 'Lse Term:', 'POTL Mo Fee:',
+    'POTL:', 'Park Cost/Mo:', 'Parking Inc:', 'Pay Freq:', 'Phone:', 'Pool:', 'Pvt Entrance:', 'Sewers:', 'Tot Pk Spcs:',
+    'Water Inc:', 'Water Supply:', 'Water:', 'Waterfront:',
     'Image URL:', 'Data without label:', 'Status:'
 ]
 
