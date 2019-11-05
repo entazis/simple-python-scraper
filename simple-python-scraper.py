@@ -15,7 +15,7 @@ from google.auth.transport.requests import Request
 
 # Enable the Drive API and download credentials.json here: https://developers.google.com/drive/api/v3/quickstart/python
 
-# If deleting output file on google drive delete file-id.txt
+# If deleting output file on google drive, delete file-id.txt
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = [
     'https://www.googleapis.com/auth/drive.file',
