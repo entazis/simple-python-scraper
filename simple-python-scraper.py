@@ -4,6 +4,7 @@ from contextlib import closing
 from bs4 import BeautifulSoup
 import pandas as pd
 import io
+import csv
 
 import pickle
 import os.path
@@ -132,24 +133,33 @@ def is_good_response(resp):
             and content_type.find('html') > -1)
 
 
-def get_urls_from_google_sheet():
+def get_urls_from(storage):
     try:
-        service = build('sheets', 'v4', credentials=get_creds())
+        urls_from_storage = []
 
-        sheet = service.spreadsheets()
-        result = sheet.values().get(
-            spreadsheetId=URL_SPREADSHEET_ID,
-            range=URL_RANGE_NAME).execute()
-        values = result.get('values', [])
-        spreadsheet_urls = []
+        if storage == 'drive':
+            service = build('sheets', 'v4', credentials=get_creds())
+            sheet = service.spreadsheets()
+            result = sheet.values().get(
+                spreadsheetId=URL_SPREADSHEET_ID,
+                range=URL_RANGE_NAME).execute()
+            values = result.get('values', [])
+        elif storage == 'local':
+            with open('urls.csv', 'r') as f:
+                reader = csv.reader(f)
+                values = list(reader)
+        else:
+            with open('urls.csv', 'r') as f:
+                reader = csv.reader(f)
+                values = list(reader)
 
         if not values:
-            print('No urls found in the spreadsheet.')
+            print('No urls found in the storage.')
         else:
             for row in values:
-                spreadsheet_urls.append(row[0])
+                urls_from_storage.append(row[0])
 
-        return spreadsheet_urls
+        return urls_from_storage
 
     except Exception as e:
         log_error(e)
@@ -246,11 +256,12 @@ if __name__ == '__main__':
     print('Google drive authorization..')
     authorize()
 
-    print('Getting urls from Google sheet..')
-    urls_from_sheet = get_urls_from_google_sheet()
+    # You can set this to 'drive' or 'local', by default it will use 'local'
+    print('Getting urls from..')
+    urls = get_urls_from('local')
 
     print('Getting data from v3.torontomls.net..')
-    scrape_data_from_urls(urls_from_sheet)
+    scrape_data_from_urls(urls)
 
     if os.path.exists('file-id.txt'):
         file_id_file = open("file-id.txt", "r")
