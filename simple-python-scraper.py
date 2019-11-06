@@ -201,13 +201,7 @@ def update_csv_on_google_drive(google_drive_file_id):
             print('Download %d%%.' % int(status.progress() * 100))
 
         # Update Status
-        df = pd.read_csv('output.csv')
-        df_former = pd.read_csv('output-previous.csv', index_col=False)
-        expired = df_former[~df_former['Key:'].str.contains('|'.join(df['Key:']), na=False)]
-        if not expired.empty:
-            expired['Status:'] = "Not Available"
-            df = df.append(expired)
-            df.to_csv('output.csv', index=False)
+        merge_output_files()
 
         media_body = MediaFileUpload(
             'output.csv',
@@ -222,6 +216,16 @@ def update_csv_on_google_drive(google_drive_file_id):
 
     except Exception as e:
         log_error(e)
+
+
+def merge_output_files():
+    df = pd.read_csv('output.csv')
+    df_former = pd.read_csv('output-previous.csv', index_col=False)
+    expired = df_former[~df_former['Key:'].str.contains('|'.join(df['Key:']), na=False)]
+    if not expired.empty:
+        expired['Status:'] = "Not Available"
+        df = df.append(expired)
+        df.to_csv('output.csv', index=False)
 
 
 def get_creds():
@@ -257,20 +261,39 @@ if __name__ == '__main__':
     authorize()
 
     # You can set this to 'drive' or 'local', by default it will use 'local'
+    STORAGE = 'local'
+
     print('Getting urls from..')
-    urls = get_urls_from('local')
+    urls = get_urls_from(STORAGE)
 
     print('Getting data from v3.torontomls.net..')
     scrape_data_from_urls(urls)
 
-    if os.path.exists('file-id.txt'):
-        file_id_file = open("file-id.txt", "r")
-        print('Updating file on Google drive..')
-        update_csv_on_google_drive(file_id_file.read())
+    if STORAGE == 'drive':
+        if os.path.exists('file-id.txt'):
+            file_id_file = open("file-id.txt", "r")
+            print('Updating file on Google drive..')
+            update_csv_on_google_drive(file_id_file.read())
+        else:
+            print('Uploading file to Google drive..')
+            file_id = upload_csv_to_google_drive()
+            file_id_file = open("file-id.txt", "w")
+            file_id_file.write(file_id)
+    elif STORAGE == 'local':
+        if os.path.exists('output-previous.csv'):
+            print('Updating file in local storage..')
+            merge_output_files()
+        else:
+            print('Creating copy in local storage..')
+            df = pd.read_csv('output.csv')
+            df.to_csv('output-previous.csv', index=False)
     else:
-        print('Uploading file to Google drive..')
-        file_id = upload_csv_to_google_drive()
-        file_id_file = open("file-id.txt", "w")
-        file_id_file.write(file_id)
+        if os.path.exists('output-previous.csv'):
+            print('Updating file in local storage..')
+            merge_output_files()
+        else:
+            print('Creating copy in local storage..')
+            df = pd.read_csv('output.csv')
+            df.to_csv('output-previous.csv', index=False)
 
     print('done.\n')
