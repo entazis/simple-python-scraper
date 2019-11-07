@@ -30,24 +30,7 @@ URL_RANGE_NAME = 'Sheet1!A:A'
 
 # You can set the order of the columns here
 # Also if a label does not listed here then the script adds it to the end of the csv
-COLUMNS = [
-    'Key:',
-    'List:', 'For:', 'SPIS:', 'Last Status:', 'DOM:', 'Unit#:', 'Corp#:', 'Locker#:', 'Locker Lev Unit:',
-    'Locker Unit#:', 'Level:', 'Rms:', 'Bedrooms:', 'Washrooms:', 'Dir/Cross St:', 'Prop Mgmt:', 'MLS#:',
-    'Contract Date:', 'PIN#:', 'Possession Date:', 'Possession Remarks:', 'Kitchens:', 'Fam Rm:', 'Basement:',
-    'Fireplace/Stv:', 'Heat:', 'Apx Age:', 'Apx Sqft:', 'Sqft Source:', 'Exposure:', 'Phys Hdp-Eqp:',
-    'Spec Desig:', 'Lndry Acc:', 'Lndry Lev:', 'Pets Perm:', 'Locker:', 'Maintenance:', 'A/C:', 'Central Vac:',
-    'UFFI:', 'Elev/Lift:', 'Retirement:', 'All Incl:', 'Water Incl:', 'Heat Incl:', 'Hydro Incl:',
-    'Cable TV Incl:', 'CAC Incl:', 'Bldg Ins Incl:', 'Prkg Incl:', 'ComElem Inc:', 'Energy Cert:', 'Cert Level:',
-    'GreenPIS:', 'Pvt Ent:', 'Furnished:', 'Balcony:', 'Exterior:', 'Gar/Gar Spcs:', 'Park/Drive:', 'Park Type:',
-    'Park/Drv Spcs:', 'Tot Prk Spcs:', 'Park $/Mo:', 'Prk Lvl/Unit:', 'Bldg Amen:', 'Prop Feat:',
-    'Client Remks:', 'Extras:', 'Listing Contracted With:', 'Acreage:', 'All Inclusive:', 'CAC Inc:', 'Cable Inc:',
-    'Cable TV Util:', 'Com Elem Inc:', 'Contract:', 'Drive Prk Spcs:', 'Drive:', 'Farm/Agr:', 'Fronting On:', 'Gas:',
-    'Heat Inc:', 'Hydro Inc:', 'Hydro Util:', 'Irreg:', 'Lease:', 'Lndy Lev:', 'Lot:', 'Lse Term:', 'POTL Mo Fee:',
-    'POTL:', 'Park Cost/Mo:', 'Parking Inc:', 'Pay Freq:', 'Phone:', 'Pool:', 'Pvt Entrance:', 'Sewers:', 'Tot Pk Spcs:',
-    'Water Inc:', 'Water Supply:', 'Water:', 'Waterfront:',
-    'Image URL:', 'Data without label:', 'Status:'
-]
+COLUMNS = []
 
 
 def log_error(e):
@@ -56,19 +39,19 @@ def log_error(e):
 
 def scrape_data_from_urls(urls):
     headers = {
-        "Host": "v3.torontomls.net",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Cache-Control": "max-age=0"
+        "Host": "",
+        "User-Agent": "",
+        "Accept": "",
+        "Accept-Encoding": "",
+        "Connection": "",
+        "Upgrade-Insecure-Requests": "",
+        "Cache-Control": ""
     }
 
     # You can choose proxies from here: https://free-proxy-list.net/
     proxies = {
-        'http': 'http://194.226.34.132:5555',
-        'https': 'http://194.226.34.132:5555'
+        'http': '',
+        'https': ''
     }
 
     df = pd.DataFrame(columns=COLUMNS)
@@ -272,7 +255,7 @@ if __name__ == '__main__':
     print('Getting urls from..')
     urls = get_urls_from(STORAGE)
 
-    print('Getting data from v3.torontomls.net..')
+    print('Getting data from urls..')
     scrape_data_from_urls(urls)
 
     if STORAGE == 'drive':
