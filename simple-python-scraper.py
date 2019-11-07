@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import io
 import csv
+import json
 
 import pickle
 import os.path
@@ -82,11 +83,16 @@ def scrape_data_from_urls(urls):
                 forms = html.select('div.formitem.legacyBorder')
 
                 for form_index, form in enumerate(forms):
+                    print('Form #', form_index)
                     sr = pd.Series()
                     values_without_label = []
 
                     img = form.select('img.imageset')
-                    sr.at['Image URL:'] = img[0]['src']
+                    images = json.loads(img[0]['data-multi-photos'])['multi-photos']
+                    image_urls = []
+                    for image in images:
+                        image_urls.append(image['url'])
+                    sr.at['Image URL:'] = image_urls
 
                     form_fields = form.select('span.formitem.formfield')
 
